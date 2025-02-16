@@ -1,3 +1,5 @@
 git+https://github.com/RobustBench/robustbench.git
-
+torch
+torchvision
+torchaudio
 foolbox
