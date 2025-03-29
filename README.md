@@ -1,3 +1,4 @@
+![aa_fmn_comparison](https://github.com/user-attachments/assets/61e92b9a-be21-4fce-99e2-bd068f24085d)
 # Robustness Evaluation of RobustBench Models using AutoAttack and FMN
 
 ## Overview
@@ -77,7 +78,7 @@ The figure below illustrates the difference between AutoAttack and FMN on a toy 
 - AutoAttack (left) explores multiple directions within the ε-ball to find adversarial examples.
 - FMN (right) finds the **closest boundary-crossing perturbation**, either inside the ε-ball (**bounded**) or outside (**unbounded**).
 
-![AutoAttack vs FMN](https://github.com/user-attachments/assets/8ebd82a2-a5b2-4ac5-95f3-97b72988d5e3)
+![AutoAttack vs FMN](https://github.com/user-attachments/assets/01373de5-c4b4-4443-910a-d45f31f8cd37)
 
 This explains why FMN is often faster and sometimes finds different adversarial samples compared to AutoAttack, especially when used without an ε-bound.
 
