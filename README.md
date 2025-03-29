@@ -1,4 +1,3 @@
-![aa_fmn_comparison](https://github.com/user-attachments/assets/61e92b9a-be21-4fce-99e2-bd068f24085d)
 # Robustness Evaluation of RobustBench Models using AutoAttack and FMN
 
 ## Overview
