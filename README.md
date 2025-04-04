@@ -2,7 +2,7 @@
 
 :video_game: For a quick demo example for the first model, check out [this notebook](https://colab.research.google.com/drive/1mcSwVvoXpjQkbpnZvBncY0YEq2-wXr-Z#scrollTo=Crc4Y6_PPoc5).
 
-:pencil: For a complete evaluation of all five models, check out the results provided in this repository.
+:pencil: For a complete evaluation of all five models, check out the code and the results provided in this repository.
 
 ## Overview
 
@@ -75,18 +75,18 @@ FMN is an efficient gradient-based attack that **directly searches for the minim
 
 ### Results
 
-Here are the results obtained by testing autoatack with the Linf norm and fmn on all norms with 100 samples. Finally we tried applying randomized smoothing as a defense and evaluated the accuracy
+Here are the results obtained by testing autoatack with the Linf norm and fmn on all norms with 100 samples.
 
-| Model | standard accuracy | AutoAttack | FMN Linf | FMN Linf ε=8/255 | FMN L2 | FMN L1 | FMN L0 | RS defense |
-|-------|-------------------|------------|----------|------------------|--------|--------|--------|------------|
-| Carmon2019Unlabeled | 89% | 53% | 0% | 54% | 0% | 0% | 21% | |
-| Wang2023Better | 93% | 66% | 0% | 33% | 0% | 0% | 27% | |
-| Cui2023Decoupled | 95% | 68% | 0% | 32% | 0% | 0% | 24% | |
-| Xu2023Exploring | 92% | 63% | 0% | 30% | 0% | 0% | 31% | |
-| Rade2021Helper | 91% | 56% | 0% | 41% | 0% | 0% | 18% | |
+| Model | standard accuracy | AutoAttack | FMN Linf | FMN Linf ε=8/255 | FMN L2 | FMN L1 | FMN L0 |
+|-------|-------------------|------------|----------|------------------|--------|--------|--------|
+| Carmon2019Unlabeled | 89% | 53% | 0% | 54% | 0% | 0% | 21% |
+| Wang2023Better | 93% | 66% | 0% | 33% | 0% | 0% | 27% | 
+| Cui2023Decoupled | 95% | 68% | 0% | 32% | 0% | 0% | 24% | 
+| Xu2023Exploring | 92% | 63% | 0% | 30% | 0% | 0% | 31% | 
+| Rade2021Helper | 91% | 56% | 0% | 41% | 0% | 0% | 18% | 
 
 The unbounded epsilon version of FMN recorded 0% accuracy on all norms except for L0, outperforming AutoAttack.
-To compare FMN with AutoAttack in a better way, we counted how many samples had points with a maximum perturbation less than the epsilon used by autoattack (ε = 8/255) and plotted the results.
+To compare FMN with AutoAttack in a better way, we counted how many samples had points with a maximum perturbation less than the epsilon used by AutoAttack (ε = 8/255) and plotted the results.
 
 This is an example for the Carmon2019Unlabeled:
 
@@ -96,19 +96,24 @@ This table shows the execution times of all attacks.
 
 AutoAttack is significantly slower than FMN, and as can be seen from the following graph, after the second step of the attack (APGD-T), it can no longer find new adversarial examples.
 
+| Model | AutoAttack(s) | FMN Linf(s) | FMN L2(s) | FMN L1(s) | FMN L0 (s) |
+|-------|---------------|-------------|-----------|-----------|------------|
+| Carmon2019Unlabeled | 1188.20 | 51.45 | 51.91 | 51.81 | 51.94 |
+| Wang2023Better | 1597.80 | 59.22 | 59.27 | 59.05 | 59.24 |
+| Cui2023Decoupled | 1678.40 | 58.94 | 59.29 | 59.05 | 59.24 |
+| Xu2023Exploring | 1523.00 | 59.10 | 59.06 | 59.28 | 59.72 |
+| Rade2021Helper | 1828.60 | 77.91 | 78.28 | 78.20 | 78.58 |
+
 ![AutoAttack progress over time](results/autoattack_progress_all_models.png) 
 
+Here we can see an example of adversarial example produced with autoattack and fmn and the perturbations applied by both attacks.
 
-The figure below illustrates the difference between AutoAttack and FMN on a toy problem:
+In this case, Autoattack has not been able to find an adversarial example, while fmn does, but by applying a perturbation that completely distorts the original image.
+![Sample 23 Linf](results/Carmon2019Unlabeled/Linf/sample_23.png)
+![Sample 23 L2](results/Carmon2019Unlabeled/L2/sample_23.png)
+![Sample 23 L1](results/Carmon2019Unlabeled/L1/sample_23.png)
+![Sample 23 L0](results/Carmon2019Unlabeled/L0/sample_23.png)
 
-- The **red curve** represents the model's decision boundary.
-- The **black dashed circle** is the ε-ball constraint.
-- The **black cross** is the original input.
-- AutoAttack (left) explores multiple directions within the ε-ball to find adversarial examples.
-- FMN (right) finds the **closest boundary-crossing perturbation**, either inside the ε-ball (**bounded**) or outside (**unbounded**).
+All other examples are saved in the results folder of this repository.
 
-![AutoAttack vs FMN](https://github.com/user-attachments/assets/01373de5-c4b4-4443-910a-d45f31f8cd37)
-
-This explains why FMN is often faster and sometimes finds different adversarial samples compared to AutoAttack, especially when used without an ε-bound.
-
----
+All attacks over each model were evaluated on Google Colab using their t4 GPU.
