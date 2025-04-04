@@ -1,138 +1,243 @@
 import torch
 from robustbench.data import load_cifar10
 from robustbench.utils import load_model
-from robustbench.eval import benchmark
-import foolbox as fb
 from autoattack import AutoAttack
+import foolbox as fb
+import time
 import matplotlib.pyplot as plt
 import numpy as np
+import os
+import sys
+import re
+import io
+from utils import save_and_plot_all_norms
 
-# Detect device (MPS or CUDA)
+# Set up output directory
+output_dir = ("./results")
+os.makedirs(output_dir, exist_ok=True)
+
+# Define epsilon for AutoAttack and FMN threshold
+epsilon = 8 / 255
+
+# Detect device (use GPU or MPS if available)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-#device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-# Select model
-model_name = "Carmon2019Unlabeled"
-#model_name = "Wang2023Better_WRN-28-10"
-#model_name = "Cui2023Decoupled_WRN-28-10"
-#model_name = "Xu2023Exploring_WRN-28-10	"
-#model_name = "Huang2022Revisiting_WRN-A4	"
+# List of models to evaluate
+models = [
+    "Carmon2019Unlabeled",
+    "Wang2023Better_WRN-28-10",
+    "Cui2023Decoupled_WRN-28-10",
+    "Xu2023Exploring_WRN-28-10",
+    "Rade2021Helper_extra"
+]
 
-# Evaluate the model with AutoAttack
-print(f"\nEvaluating model: {model_name}")
+# Number of test samples
+n_examples = 100
 
-# Load model and move to device (MPS/CUDA or CPU)
-model = load_model(model_name=model_name, dataset="cifar10", threat_model="Linf").to(device)
-model.eval()
+print("Setup complete.")
 
-# Load 50 CIFAR-10 test samples
-images, labels = load_cifar10(n_examples=50)
+# Load CIFAR-10 test samples
+images, labels = load_cifar10(n_examples)
 images, labels = images.clone().detach().to(device), labels.clone().detach().to(device)
 
-# Classification of the images without any attack
-outputs = model(images)
-_, predicted = torch.max(outputs, 1)
-# True labels
-print(f"True labels: {labels}")
-# Predicted labels
-print(f"Predicted labels: {predicted}")
-# Accuracy of the model
-correct = (predicted == labels).sum().item()
-print(f"Correctly classified: {correct}/{len(labels)} ({correct/len(labels)*100:.2f}%)")
+attack_progress = {}
+model_results = {}
 
-# --- Run AutoAttack Manually ---
-print("\n**** AutoAttack ****\n")
-autoattack = AutoAttack(model, norm='Linf', eps=8/255, version='standard', device=device)
-adv_images_autoattack = autoattack.run_standard_evaluation(images, labels, bs=50)
-# Predicted labels after AutoAttack
-_, predicted_aa = model(adv_images_autoattack).max(1)
-print(f"Predicted labels: {predicted_aa}")
-# Compare true labels with predicted labels after AutoAttack
-wrong_indexes_aa = torch.nonzero(labels != predicted_aa)
-print(f"Wrong indexes AA: {wrong_indexes_aa}")
+fmn_attacks = {
+    "Linf": fb.attacks.LInfFMNAttack(),
+    "L2": fb.attacks.L2FMNAttack(),
+    "L1": fb.attacks.L1FMNAttack(),
+    "L0": fb.attacks.L0FMNAttack(),
+}
 
-# Robustness of the model after AutoAttack
-correct = torch.sum(labels == predicted_aa)
-total = len(labels)
-print(f"Correct predictions: {correct}/{total} ({correct/total*100:.2f}%)")
-print(adv_images_autoattack[wrong_indexes_aa[0]].cpu().numpy().shape)
+print("Dataset loaded and storage initialized.")
 
 
-# --- Run FMN Attack (Foolbox) ---
-print("\n**** FMN Attack ****\n")
-fmodel = fb.PyTorchModel(model, bounds=(0, 1), device=device)
-attack = fb.attacks.LInfFMNAttack()
-#attack = fb.attacks.LinfProjectedGradientDescentAttack()
-#attack = fb.attacks.LinfDeepFoolAttack()
+for model_name in models:
+    print(f"\n==== Evaluating model: {model_name} ====")
 
-raw, clipped, success = attack(fmodel, images, labels, epsilons=8/255)
+    # Load and prepare model
+    model = load_model(model_name=model_name, dataset="cifar10", threat_model="Linf").to(device)
+    model.eval()
 
-# Predicted labels after FMN
-_, predicted_fmn = model(clipped).max(1)
-print(f"Predicted labels: {predicted_fmn}")
-# Compare true labels with predicted labels after FMN
-wrong_indexes_fmn = torch.nonzero(labels != predicted_fmn)
-print(f"Wrong indexes FMN: {wrong_indexes_fmn}")
+    # Classification before attacks (Clean accuracy)
+    outputs = model(images)
+    _, predicted = torch.max(outputs, 1)
+    clean_accuracy = (predicted == labels).sum().item() / len(labels) * 100
+    print(f"\nClean Accuracy: {clean_accuracy:.2f}%")
+    # Print the true labels
+    print(f"True labels: {labels}")
 
-# Robustness of the model after FMN
-correct = torch.sum(labels == predicted_fmn)
-total = len(labels)
-print(f"Correct predictions: {correct}/{total} ({correct/total*100:.2f}%)")
-print(clipped[wrong_indexes_fmn[0]].cpu().numpy().shape)
+    ## AutoAttack
 
-# Samples misclassified by FMN but not by AA
-wrong_fmn_not_aa = torch.nonzero((labels != predicted_fmn) & (labels == predicted_aa)).squeeze()
-print(f"Wrongly classified by FMN but not by AA: {wrong_fmn_not_aa}")
+    # Initialize AutoAttack
+    autoattack = AutoAttack(model, norm='Linf', eps=epsilon, version='standard', device=device)
 
-# Samples misclassified by AA but not by FMN
-wrong_aa_not_fmn = torch.nonzero((labels == predicted_fmn) & (labels != predicted_aa)).squeeze()
-print(f"Wrongly classified by AA but not by FMN: {wrong_aa_not_fmn}")
+    # Capture stdout while also printing progress
+    old_stdout = sys.stdout
+    sys.stdout = mystdout = io.StringIO()
+    print("\n--- Starting AutoAttack ---")
 
-# Samples that are classified differently by FMN and AA
-diff = torch.nonzero(predicted_fmn != predicted_aa)
-print(f"Different indexes: {diff}")
+    start_aa = time.time()
+    adv_images_autoattack = autoattack.run_standard_evaluation(images, labels, bs=50)
+    end_aa = time.time()
 
-# True Labels, Predicted Labels after FMN, Predicted Labels after AA of the samples that are classified differently
-for i in diff:
-    print(f"Index: {i}")
-    print(f"True label: {labels[i]}")
-    print(f"Label after FMN: {predicted_fmn[i]}")
-    print(f"Label after AA: {predicted_aa[i]}")
-    print("\n")
+    sys.stdout = old_stdout  # Restore stdout
+    aa_log = mystdout.getvalue()
+    print(aa_log)  # Print the captured log for visibility
 
-# Plot images and perturbations of the samples that are classified differently
-for i in diff:
-    idx = i.item()
-    true_label = labels[idx].item()
-    label_fmn = predicted_fmn[idx].item()
-    label_aa = predicted_aa[idx].item()
+    # Get AutoAttack predicted labels and wrong indexes
+    _, predicted_aa = model(adv_images_autoattack).max(1)
+    print(f"Predicted labels AA: {predicted_aa}")
+    correct = torch.sum(labels == predicted_aa)
+    total = len(labels)
+    print(f"Correct predictions AA: {correct}/{total} ({correct/total*100:.2f}%)")
 
-    original_image = images[idx].cpu().numpy().transpose(1, 2, 0)
-    fmn_image = clipped[idx].cpu().numpy().transpose(1, 2, 0)
-    aa_image = adv_images_autoattack[idx].cpu().numpy().transpose(1, 2, 0)
-    perturbation_fmn = np.clip(fmn_image - original_image, 0, 1)
-    perturbation_aa = np.clip(aa_image - original_image, 0, 1)
+    # Parse the log using regex to extract robustness and time
+    pattern_init    = r'initial accuracy:\s*([\d\.]+)%'
+    pattern_apgdce  = r'robust accuracy after APGD-CE:\s*([\d\.]+)% \(total time ([\d\.]+) s\)'
+    pattern_apgdt   = r'robust accuracy after APGD-T:\s*([\d\.]+)% \(total time ([\d\.]+) s\)'
+    pattern_fabt    = r'robust accuracy after FAB-T:\s*([\d\.]+)% \(total time ([\d\.]+) s\)'
+    pattern_square  = r'robust accuracy after SQUARE:\s*([\d\.]+)% \(total time ([\d\.]+) s\)'
 
-    fig, axs = plt.subplots(1, 5, figsize=(15, 3))
-    axs[0].imshow(original_image)
-    axs[0].set_title(f"Original\nLabel: {true_label}")
-    axs[0].axis('off')
+    m_init   = re.search(pattern_init, aa_log)
+    m_apgdce = re.search(pattern_apgdce, aa_log)
+    m_apgdt  = re.search(pattern_apgdt, aa_log)
+    m_fabt   = re.search(pattern_fabt, aa_log)
+    m_square = re.search(pattern_square, aa_log)
 
-    axs[1].imshow(fmn_image)
-    axs[1].set_title(f"FMN\nLabel: {label_fmn}")
-    axs[1].axis('off')
+    if m_init and m_apgdce and m_apgdt and m_fabt and m_square:
+        initial_acc = float(m_init.group(1))
+        apgdce_acc  = float(m_apgdce.group(1))
+        apgdce_time = float(m_apgdce.group(2))
+        apgdt_acc   = float(m_apgdt.group(1))
+        apgdt_time  = float(m_apgdt.group(2))
+        fabt_acc    = float(m_fabt.group(1))
+        fabt_time   = float(m_fabt.group(2))
+        square_acc  = float(m_square.group(1))
+        square_time = float(m_square.group(2))
+    else:
+        print("Error: Unable to parse AutoAttack log output.")
 
-    axs[2].imshow(perturbation_fmn * 10) # Scale the perturbation for better visualization
-    axs[2].set_title("Perturbation FMN")
-    axs[2].axis('off')
+    aa_times = [0.0, apgdce_time, apgdt_time, fabt_time, square_time]
+    aa_accuracies = [initial_acc, apgdce_acc, apgdt_acc, fabt_acc, square_acc]
+    aa_steps = ["Initial", "APGD-CE", "APGD-T", "FAB-T", "SQUARE"]
 
-    axs[3].imshow(aa_image)
-    axs[3].set_title(f"AA\nLabel: {label_aa}")
-    axs[3].axis('off')
+    attack_progress[model_name] = list(zip(aa_times, aa_accuracies, aa_steps))
 
-    axs[4].imshow(perturbation_aa * 10) # Scale the perturbation for better visualization
-    axs[4].set_title("Perturbation AA")
-    axs[4].axis('off')
-
+    # ----- Plotting AutoAttack Robust Accuracy Flow -----
+    plt.figure(figsize=(10, 5))
+    colors = ['blue', 'green', 'orange', 'purple', 'brown']
+    for idx, (model_name, progress) in enumerate(attack_progress.items()):
+        times, accs, steps = zip(*progress)
+        plt.plot(times, accs, marker='o', linestyle='-', label=model_name, color=colors[idx % len(colors)])
+        for t, acc, step in zip(times, accs, steps):
+            plt.text(t, acc, f"{step}\n{acc:.1f}%", fontsize=10, verticalalignment='bottom', horizontalalignment='right')
+    plt.xlabel("Cumulative Time (s)", fontsize=12)
+    plt.ylabel("Robust Accuracy (%)", fontsize=12)
+    plt.title("AutoAttack - Robust Accuracy Over Time", fontsize=14)
+    plt.legend()
+    plt.grid(True, linestyle="--", alpha=0.6)
+    autoattack_progress_path = os.path.join(output_dir, "autoattack_progress_all_models.png")
+    plt.savefig(autoattack_progress_path)
+    print(f"\nSaved AutoAttack progress plot (all models) to: {autoattack_progress_path}\n")
     plt.show()
+
+    ## FMN
+
+    # --- FMN Attacks ---
+    fmodel = fb.PyTorchModel(model, bounds=(0, 1), device=device)
+    fmn_results = {}
+    adv_dict = {}
+
+    for norm, attack in fmn_attacks.items():
+        print(f"\n--- Starting FMN Attack ({norm}) on model {model_name} ---")
+
+        # Capture stdout to track attack progress
+        old_stdout = sys.stdout
+        sys.stdout = mystdout = io.StringIO()
+
+        start_fmn = time.time()
+        _, adv_images, _ = attack(fmodel, images, labels, epsilons=None)
+        end_fmn = time.time()
+
+        sys.stdout = old_stdout  # Restore stdout
+        fmn_log = mystdout.getvalue()
+        print(fmn_log)  # Print captured FMN attack log
+        print(f"Attack executed in {end_fmn-start_fmn:.2f} s")
+
+      # Get FMN predicted labels and wrong indexes
+        _, predicted_fmn = model(adv_images).max(1)
+        fmn_accuracy = torch.sum(labels == predicted_fmn).item() / len(labels) * 100
+        perturbations = torch.norm((adv_images - images).reshape(adv_images.shape[0], -1), dim=1).cpu().numpy()
+
+        fmn_results[norm] = {
+            "accuracy": fmn_accuracy,
+            "execution_time": end_fmn - start_fmn,
+            "perturbations": perturbations
+        }
+        adv_dict[norm] = adv_images
+
+        print(f"Predicted labels FMN ({norm}): {predicted_fmn}")
+        correct = torch.sum(labels == predicted_fmn)
+        total = len(labels)
+        print(f"Robust Accuracy after FMN ({norm}): {correct}/{total} ({correct/total*100:.2f}%)")
+
+    # --- Save and Plot Images for Each Norm ---
+    save_and_plot_all_norms(model, model_name, images, labels, adv_images_autoattack, adv_dict, output_dir)
+
+    model_results[model_name] = {
+        "clean_accuracy": clean_accuracy,
+        "fmn_results": fmn_results
+    }
+
+    # --- FMN-Linf Histogram of Maximum Perturbations ---
+    start_fmn = time.time()
+    _, adv_images_linf, _ = fmn_attacks["Linf"](fmodel, images, labels, epsilons=None)
+    end_fmn = time.time()
+
+    max_perturbations = []
+    for i in range(len(images)):
+        original_image = images[i].cpu().numpy()
+        adversarial_image = adv_images_linf[i].cpu().numpy()
+        perturbation = np.abs(adversarial_image - original_image)
+        max_perturbations.append(np.max(perturbation))
+
+    min_val = min(max_perturbations)
+    max_val = max(max_perturbations)
+    num_bins = n_examples
+    bins = np.linspace(min_val, max_val, num_bins)
+    if not np.any(np.isclose(bins, epsilon)):
+        bins = np.sort(np.append(bins, epsilon))
+
+    samples_within_epsilon = sum(p <= epsilon for p in max_perturbations)
+    samples_outside_epsilon = len(max_perturbations) - samples_within_epsilon
+    print(f"\nSamples with max perturbation <= {epsilon:.4f}: {samples_within_epsilon}")
+    print(f"Samples with max perturbation > {epsilon:.4f}: {samples_outside_epsilon}\n")
+
+    plt.figure(figsize=(12, 4))
+    n, bins_used, patches = plt.hist(max_perturbations, bins=bins, color='skyblue', edgecolor='black', alpha=0.7)
+    plt.axvline(x=epsilon, color='red', linestyle='--', label=f"Epsilon = {epsilon:.4f}")
+    plt.xlabel("Maximum Perturbation (L_inf)", fontsize=12)
+    plt.ylabel("Frequency", fontsize=12)
+    plt.title(f"Histogram of Maximum Perturbations - {model_name}", fontsize=14)
+    plt.legend()
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    fmn_linf_histogram_path = os.path.join(output_dir, f"{model_name}_fmn_linf_histogram.png")
+    plt.savefig(fmn_linf_histogram_path)
+    print(f"Saved FMN-Linf histogram for {model_name} to: {fmn_linf_histogram_path}")
+    plt.show()
+
+    linf_acc = 100 * torch.sum(labels == model(adv_images_linf).max(1)[1]).item() / len(labels)
+    fmn_results["Linf"] = {
+            "accuracy": linf_acc,
+            "execution_time": end_fmn - start_fmn,
+            "perturbations": np.array(max_perturbations)
+        }
+
+    model_results[model_name] = {
+            "clean_accuracy": clean_accuracy,
+            "fmn_results": fmn_results
+        }
