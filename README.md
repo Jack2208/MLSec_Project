@@ -1,5 +1,9 @@
 # Robustness Evaluation of RobustBench Models using AutoAttack and FMN
 
+:video_game: For a quick demo example for the first model, check out [this notebook](https://colab.research.google.com/drive/1mcSwVvoXpjQkbpnZvBncY0YEq2-wXr-Z#scrollTo=Crc4Y6_PPoc5).
+
+:pencil: For a complete evaluation of all five models, check out the results provided in this repository.
+
 ## Overview
 
 This project compares the robustness of 5 models from RobustBench when attacked using:
@@ -68,6 +72,32 @@ FMN is an efficient gradient-based attack that **directly searches for the minim
 | Robustness Scores | RobustBench Standard | Comparable when ε-bounded |
 
 ---
+
+### Results
+
+Here are the results obtained by testing autoatack with the Linf norm and fmn on all norms with 100 samples. Finally we tried applying randomized smoothing as a defense and evaluated the accuracy
+
+| Model | standard accuracy | AutoAttack | FMN Linf | FMN Linf ε=8/255 | FMN L2 | FMN L1 | FMN L0 | RS defense |
+|-------|-------------------|------------|----------|------------------|--------|--------|--------|------------|
+| Carmon2019Unlabeled | 89% | 53% | 0% | 54% | 0% | 0% | 21% | |
+| Wang2023Better | 93% | 66% | 0% | 33% | 0% | 0% | 27% | |
+| Cui2023Decoupled | 95% | 68% | 0% | 32% | 0% | 0% | 24% | |
+| Xu2023Exploring | 92% | 63% | 0% | 30% | 0% | 0% | 31% | |
+| Rade2021Helper | 91% | 56% | 0% | 41% | 0% | 0% | 18% | |
+
+The unbounded epsilon version of FMN recorded 0% accuracy on all norms except for L0, outperforming AutoAttack.
+To compare FMN with AutoAttack in a better way, we counted how many samples had points with a maximum perturbation less than the epsilon used by autoattack (ε = 8/255) and plotted the results.
+
+This is an example for the Carmon2019Unlabeled:
+
+![Samples perturbed with a Linf norm less than 8/255](results/Carmon2019Unlabeled_fmn_linf_histogram.png) 
+
+This table shows the execution times of all attacks. 
+
+AutoAttack is significantly slower than FMN, and as can be seen from the following graph, after the second step of the attack (APGD-T), it can no longer find new adversarial examples.
+
+![AutoAttack progress over time](results/autoattack_progress_all_models.png) 
+
 
 The figure below illustrates the difference between AutoAttack and FMN on a toy problem:
 
