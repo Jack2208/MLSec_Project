@@ -79,7 +79,7 @@ Here are the results obtained by testing autoatack with the Linf norm and fmn on
 
 | Model | standard accuracy | AutoAttack | FMN Linf | FMN Linf ε=8/255 | FMN L2 | FMN L1 | FMN L0 |
 |-------|-------------------|------------|----------|------------------|--------|--------|--------|
-| Carmon2019Unlabeled | 89% | 53% | 0% | 54% | 0% | 0% | 21% |
+| Carmon2019Unlabeled | 89% | 53% | 0% | 46% | 0% | 0% | 21% |
 | Wang2023Better | 93% | 66% | 0% | 33% | 0% | 0% | 27% | 
 | Cui2023Decoupled | 95% | 68% | 0% | 32% | 0% | 0% | 24% | 
 | Xu2023Exploring | 92% | 63% | 0% | 30% | 0% | 0% | 31% | 
