@@ -11,7 +11,7 @@ import sys
 import re
 import io
 from utils import save_and_plot_all_norms
-from utils import parse_autoattacl_log
+from utils import parse_autoattack_log
 
 # Set up output directory
 output_dir = ("./results")
@@ -43,7 +43,6 @@ print("Setup complete.")
 images, labels = load_cifar10(n_examples)
 images, labels = images.clone().detach().to(device), labels.clone().detach().to(device)
 
-attack_progress = {}
 model_results = {}
 
 fmn_attacks = {

@@ -78,7 +78,9 @@ def save_and_plot_all_norms(model, model_name, images, labels, adv_images_autoat
 
 # This function is used to save the values of accuracy and time of AutoAttacks steps to plot a graph in a folloqing cell
 def parse_autoattack_log(log: str, model, adv_images, labels, model_name):
-    
+
+    attack_progress = {}
+
     # Regex patterns
     pattern_init    = r'initial accuracy:\s*([\d\.]+)%'
     pattern_apgdce  = r'robust accuracy after APGD-CE:\s*([\d\.]+)% \(total time ([\d\.]+) s\)'
@@ -113,4 +115,4 @@ def parse_autoattack_log(log: str, model, adv_images, labels, model_name):
 
     attack_progress[model_name] = list(zip(aa_times, aa_accuracies, aa_steps))
 
-    return {model_name: list(zip(aa_times, aa_accuracies, aa_steps))}
+    return attack_progress
