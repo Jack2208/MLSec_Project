@@ -1,3 +1,4 @@
+import re
 import os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -74,3 +75,42 @@ def save_and_plot_all_norms(model, model_name, images, labels, adv_images_autoat
             plt.close()
 
     print("Function execution completed.")
+
+# This function is used to save the values of accuracy and time of AutoAttacks steps to plot a graph in a folloqing cell
+def parse_autoattack_log(log: str, model, adv_images, labels, model_name):
+    
+    # Regex patterns
+    pattern_init    = r'initial accuracy:\s*([\d\.]+)%'
+    pattern_apgdce  = r'robust accuracy after APGD-CE:\s*([\d\.]+)% \(total time ([\d\.]+) s\)'
+    pattern_apgdt   = r'robust accuracy after APGD-T:\s*([\d\.]+)% \(total time ([\d\.]+) s\)'
+    pattern_fabt    = r'robust accuracy after FAB-T:\s*([\d\.]+)% \(total time ([\d\.]+) s\)'
+    pattern_square  = r'robust accuracy after SQUARE:\s*([\d\.]+)% \(total time ([\d\.]+) s\)'
+
+    m_init   = re.search(pattern_init, log)
+    m_apgdce = re.search(pattern_apgdce, log)
+    m_apgdt  = re.search(pattern_apgdt, log)
+    m_fabt   = re.search(pattern_fabt, log)
+    m_square = re.search(pattern_square, log)
+
+    if m_init and m_apgdce and m_apgdt and m_fabt and m_square:
+        initial_acc = float(m_init.group(1))
+        apgdce_acc  = float(m_apgdce.group(1))
+        apgdce_time = float(m_apgdce.group(2))
+        apgdt_acc   = float(m_apgdt.group(1))
+        apgdt_time  = float(m_apgdt.group(2))
+        fabt_acc    = float(m_fabt.group(1))
+        fabt_time   = float(m_fabt.group(2))
+        square_acc  = float(m_square.group(1))
+        square_time = float(m_square.group(2))
+    else:
+        print("Error: Unable to parse AutoAttack log output.")
+        return {}
+
+    # Build and return the attack_progress dictionary
+    aa_times = [0.0, apgdce_time, apgdt_time, fabt_time, square_time]
+    aa_accuracies = [initial_acc, apgdce_acc, apgdt_acc, fabt_acc, square_acc]
+    aa_steps = ["Initial", "APGD-CE", "APGD-T", "FAB-T", "SQUARE"]
+
+    attack_progress[model_name] = list(zip(aa_times, aa_accuracies, aa_steps))
+
+    return {model_name: list(zip(aa_times, aa_accuracies, aa_steps))}
