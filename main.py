@@ -171,11 +171,16 @@ for model_name in models:
     end_fmn = time.time()
 
     max_perturbations = []
+    samples_within_epsilon_indices = []
+    
+    max_perturbations = []
     for i in range(len(images)):
         original_image = images[i].cpu().numpy()
         adversarial_image = adv_images_linf[i].cpu().numpy()
         perturbation = np.abs(adversarial_image - original_image)
         max_perturbations.append(np.max(perturbation))
+        if np.max(perturbation) <= epsilon:
+            samples_within_epsilon_indices.append(i)
 
     min_val = min(max_perturbations)
     max_val = max(max_perturbations)
@@ -186,8 +191,9 @@ for model_name in models:
 
     samples_within_epsilon = sum(p <= epsilon for p in max_perturbations)
     samples_outside_epsilon = len(max_perturbations) - samples_within_epsilon
-    print(f"\nSamples with max perturbation <= {epsilon:.4f}: {samples_within_epsilon}")
-    print(f"Samples with max perturbation > {epsilon:.4f}: {samples_outside_epsilon}\n")
+    print(f"\nNumber of samples with max perturbation <= {epsilon:.4f}: {samples_within_epsilon}")
+    print(f"Number of samples with max perturbation > {epsilon:.4f}: {samples_outside_epsilon}\n")
+    print(f"Indices of samples with perturbation <= epsilon:\n {samples_within_epsilon_indices}")
 
     plt.figure(figsize=(12, 4))
     n, bins_used, patches = plt.hist(max_perturbations, bins=bins, color='skyblue', edgecolor='black', alpha=0.7)
