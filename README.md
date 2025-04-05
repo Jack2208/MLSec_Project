@@ -1,6 +1,6 @@
 # Robustness Evaluation of RobustBench Models using AutoAttack and FMN
 
-:video_game: For a quick demo example for the first model, check out [this notebook](https://colab.research.google.com/drive/1mcSwVvoXpjQkbpnZvBncY0YEq2-wXr-Z#scrollTo=Crc4Y6_PPoc5).
+:video_game: For a quick demo example for the first model, check out [this notebook](https://colab.research.google.com/drive/10-8Gly0O00YIGzpie1V-1Vaxfg1gRONL?usp=drive_link).
 
 :pencil: For a complete evaluation of all five models, check out the code and the results provided in this repository.
 
