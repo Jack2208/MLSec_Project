@@ -11,6 +11,7 @@ import sys
 import re
 import io
 from utils import save_and_plot_all_norms
+from utils import parse_autoattacl_log
 
 # Set up output directory
 output_dir = ("./results")
@@ -95,37 +96,8 @@ for model_name in models:
     total = len(labels)
     print(f"Correct predictions AA: {correct}/{total} ({correct/total*100:.2f}%)")
 
-    # Parse the log using regex to extract robustness and time
-    pattern_init    = r'initial accuracy:\s*([\d\.]+)%'
-    pattern_apgdce  = r'robust accuracy after APGD-CE:\s*([\d\.]+)% \(total time ([\d\.]+) s\)'
-    pattern_apgdt   = r'robust accuracy after APGD-T:\s*([\d\.]+)% \(total time ([\d\.]+) s\)'
-    pattern_fabt    = r'robust accuracy after FAB-T:\s*([\d\.]+)% \(total time ([\d\.]+) s\)'
-    pattern_square  = r'robust accuracy after SQUARE:\s*([\d\.]+)% \(total time ([\d\.]+) s\)'
-
-    m_init   = re.search(pattern_init, aa_log)
-    m_apgdce = re.search(pattern_apgdce, aa_log)
-    m_apgdt  = re.search(pattern_apgdt, aa_log)
-    m_fabt   = re.search(pattern_fabt, aa_log)
-    m_square = re.search(pattern_square, aa_log)
-
-    if m_init and m_apgdce and m_apgdt and m_fabt and m_square:
-        initial_acc = float(m_init.group(1))
-        apgdce_acc  = float(m_apgdce.group(1))
-        apgdce_time = float(m_apgdce.group(2))
-        apgdt_acc   = float(m_apgdt.group(1))
-        apgdt_time  = float(m_apgdt.group(2))
-        fabt_acc    = float(m_fabt.group(1))
-        fabt_time   = float(m_fabt.group(2))
-        square_acc  = float(m_square.group(1))
-        square_time = float(m_square.group(2))
-    else:
-        print("Error: Unable to parse AutoAttack log output.")
-
-    aa_times = [0.0, apgdce_time, apgdt_time, fabt_time, square_time]
-    aa_accuracies = [initial_acc, apgdce_acc, apgdt_acc, fabt_acc, square_acc]
-    aa_steps = ["Initial", "APGD-CE", "APGD-T", "FAB-T", "SQUARE"]
-
-    attack_progress[model_name] = list(zip(aa_times, aa_accuracies, aa_steps))
+    # Parse log and get attack progress
+    attack_progress = parse_autoattack_log(aa_log, model, adv_images_autoattack, labels, model_name)
 
     # ----- Plotting AutoAttack Robust Accuracy Flow -----
     plt.figure(figsize=(10, 5))
@@ -168,7 +140,7 @@ for model_name in models:
         print(fmn_log)  # Print captured FMN attack log
         print(f"Attack executed in {end_fmn-start_fmn:.2f} s")
 
-      # Get FMN predicted labels and wrong indexes
+      # Get FMN-predicted labels and wrong indexes
         _, predicted_fmn = model(adv_images).max(1)
         fmn_accuracy = torch.sum(labels == predicted_fmn).item() / len(labels) * 100
         perturbations = torch.norm((adv_images - images).reshape(adv_images.shape[0], -1), dim=1).cpu().numpy()
