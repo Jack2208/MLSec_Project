@@ -79,11 +79,11 @@ Here are the results obtained by testing autoatack with the Linf norm and fmn on
 
 | Model | standard accuracy | AutoAttack | FMN Linf | FMN Linf ε=8/255 | FMN L2 | FMN L1 | FMN L0 |
 |-------|-------------------|------------|----------|------------------|--------|--------|--------|
-| Carmon2019Unlabeled | 89% | 53% | 0% | 46% | 0% | 0% | 21% |
-| Wang2023Better | 93% | 66% | 0% | 33% | 0% | 0% | 27% | 
-| Cui2023Decoupled | 95% | 68% | 0% | 32% | 0% | 0% | 24% | 
-| Xu2023Exploring | 92% | 63% | 0% | 30% | 0% | 0% | 31% | 
-| Rade2021Helper | 91% | 56% | 0% | 41% | 0% | 0% | 18% | 
+| Carmon2019Unlabeled | 89% | 53% | 0% | 54% | 0% | 0% | 21% |
+| Wang2023Better | 93% | 66% | 0% | 67% | 0% | 0% | 27% | 
+| Cui2023Decoupled | 95% | 68% | 0% | 68% | 0% | 0% | 24% | 
+| Xu2023Exploring | 92% | 63% | 0% | 70% | 0% | 0% | 31% | 
+| Rade2021Helper | 91% | 56% | 0% | 58% | 0% | 0% | 18% | 
 
 The unbounded epsilon version of FMN recorded 0% accuracy on all norms except for L0, outperforming AutoAttack.
 To compare FMN with AutoAttack in a better way, we counted how many samples had points with a maximum perturbation less than the epsilon used by AutoAttack (ε = 8/255) and plotted the results.
